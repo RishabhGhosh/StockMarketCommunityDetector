@@ -10,5 +10,9 @@ python3 -m venv venv
 # Activate the virtual environment
 source venv/bin/activate
 
+# Add packages to requirements.txt
+echo "holidays" >> requirements.txt
+echo "yfinance" >> requirements.txt
+
 # Install the required packages
 pip install -r ./requirements.txt
