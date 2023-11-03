@@ -229,7 +229,7 @@ def predict(text, model, write_to_csv=False, path=None, use_gpu=False, gpu_name=
 
     return result
 
-def sentiment_predict(tweets_path,output_path):
+def predict_for_csv(tweets_path,output_path):
     """
     Take a .csv or .txt file as input, with path $tweets_path, output the prediction as finBERT_predictions.csv to path $output_path.
     In finBERT_predictions.csv, there will be ['sentence', 'logitn1', 'logitn2sfmx','prediction', 'sentiment_score'] as header.
@@ -245,8 +245,6 @@ def sentiment_predict(tweets_path,output_path):
         defined as probability of positive substrat probability of negative, with range [-1,1]
     """
     # Required directory of tweets_data path and prediction output_data path
-    #tweets_path ='./SMCD/scripts/input_tweets.csv'
-    #output_path = "./SMCD/scripts/Processed Data"
     output_file = 'finBERT_predictions.csv'
     if not os.path.exists(output_path):
         os.mkdir(output_path)
@@ -269,4 +267,25 @@ def sentiment_predict(tweets_path,output_path):
         result_list = pd.concat([result_list, result], ignore_index=True)
 
     result_list.to_csv(os.path.join(output_path,output_file), index=False)
-    #print(result_list)
+
+def predict_for_singletext(text):
+    """
+    This funtion take a sentence(string) as a input, and return a list contains logitsn1, logitsn2sfmx, 
+    predictions, score of this single sentence.
+
+    Note that this funtion will throw away the original sentence in output.
+
+    result[0]:
+        logitsn1
+    result[1]:
+        logitsn2sfmx
+    result[2]:  
+        predictions
+    result[3]:
+        sentiment_score
+    """
+    predicted = predict(text,model,write_to_csv=False) 
+    for index, row in predicted.iterrows():
+        result = row.tolist()
+        result.pop(0)
+    return result
