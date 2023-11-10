@@ -6,19 +6,20 @@ import torch
 import csv
 import nltk
 import numpy as np
-import logging
+#import logging
+from tqdm import tqdm
 from transformers import AutoTokenizer
-
+from multiprocessing import Pool
 
 model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
 tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
 #model = AutoModelForSequenceClassification.from_pretrained(args.model_path,num_labels=3,cache_dir=None)
-
+'''
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
-
+'''
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
 
@@ -121,7 +122,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
             agree = mapagree[agree]
         except:
             agree = 0
-
+        '''
         if ex_index < 1:
             logger.info("*** Example ***")
             logger.info("guid: %s" % (example.guid))
@@ -132,7 +133,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
             logger.info(
                 "token_type_ids: %s" % " ".join([str(x) for x in token_type_ids]))
             logger.info("label: %s (id = %d)" % (example.label, label_id))
-
+        '''
         features.append(
             InputFeatures(input_ids=input_ids,
                           attention_mask=attention_mask,
@@ -188,40 +189,40 @@ def predict(text, model, write_to_csv=False, path=None, use_gpu=False, gpu_name=
     sentences = [text] #sent_tokenize(text)
     #print('debug',type(sentences))
     device = gpu_name if use_gpu and torch.cuda.is_available() else "cpu"
-    logging.info("Using device: %s " % device)
+    #logging.info("Using device: %s " % device)
     label_list = ['positive', 'negative', 'neutral']
     label_dict = {0: 'positive', 1: 'negative', 2: 'neutral'}
     result = pd.DataFrame(columns=['sentence', 'logitn1', 'logitn2sfmx','prediction', 'sentiment_score'])
-    for batch in chunks(sentences, len(sentences)):
-        examples = [InputExample(str(i), sentence) for i, sentence in enumerate(batch)]
+    batch=sentences
+    examples = [InputExample(str(i), sentence) for i, sentence in enumerate(batch)]
 
-        features = convert_examples_to_features(examples, label_list, 64, tokenizer)
+    features = convert_examples_to_features(examples, label_list, 64, tokenizer)
 
-        all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long).to(device)
-        all_attention_mask = torch.tensor([f.attention_mask for f in features], dtype=torch.long).to(device)
-        all_token_type_ids = torch.tensor([f.token_type_ids for f in features], dtype=torch.long).to(device)
+    all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long).to(device)
+    all_attention_mask = torch.tensor([f.attention_mask for f in features], dtype=torch.long).to(device)
+    all_token_type_ids = torch.tensor([f.token_type_ids for f in features], dtype=torch.long).to(device)
 
-        with torch.no_grad():
-            model     = model.to(device)
+    with torch.no_grad():
+        model     = model.to(device)
 
-            logits = model(all_input_ids, all_attention_mask, all_token_type_ids)[0]
-            n1 = np.array([logits[0]])
-            #print('debug',n1)
-            logging.info(logits)
-            logits = softmax(np.array(logits.cpu()))
-            n2 = np.array([logits[0]])
-            print('debug',n2)
-            sentiment_score = pd.Series(logits[:, 0] - logits[:, 1])
-            predictions = np.squeeze(np.argmax(logits, axis=1))
+        logits = model(all_input_ids, all_attention_mask, all_token_type_ids)[0]
+        n1 = np.array(logits[0])
+        #print('debug',n1)
+        #logging.info(logits)
+        logits = softmax(np.array(logits.cpu()))
+        n2 = np.array(logits[0])
+        #print('debug',n2)
+        sentiment_score = pd.Series(logits[:, 0] - logits[:, 1])
+        predictions = np.squeeze(np.argmax(logits, axis=1))
 
-            batch_result = {'sentence': batch,
-                            'logitn1': list(n1),
-                            'logitn2sfmx': list(n2),
-                            'prediction': predictions,
-                            'sentiment_score': sentiment_score}
-
-            batch_result = pd.DataFrame(batch_result)
-            result = pd.concat([result, batch_result], ignore_index=True)
+        batch_result = {'sentence': batch,
+                        'logitn1': [n1],
+                        'logitn2sfmx': [n2],
+                        'prediction': predictions,
+                        'sentiment_score': sentiment_score}
+    
+        batch_result = pd.DataFrame(batch_result)
+        result = pd.concat([result, batch_result], ignore_index=True)
 
     result['prediction'] = result.prediction.apply(lambda x: label_dict[x])
     if write_to_csv:
@@ -262,7 +263,7 @@ def predict_for_csv(tweets_path,output_path):
 
     # Get prediction of data_list
     result_list =pd.DataFrame(columns=['sentence', 'logitn1', 'logitn2sfmx','prediction', 'sentiment_score'])
-    for tw in data_list:
+    for tw in tqdm(data_list):
         result = predict(tw,model,write_to_csv=False) 
         result_list = pd.concat([result_list, result], ignore_index=True)
 
